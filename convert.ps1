@@ -14,6 +14,11 @@ $MermaidOutputPattern = "temp-mermaid-output-*.png"
 $MermaidScale = 2
 $MermaidFormat = "png"
 
+$MaxImageHeight = 7 * 72  # Convert to points
+$MaxImageWidth = 6 * 72
+
+$wdAlignParagraphCenter = 1
+
 # Resolve output path before file exists
 $OutputFullPath = Join-Path $PWD $OutputFile
 
@@ -25,22 +30,43 @@ mmdc -i $InputFile -o $MermaidOutputMd -e $MermaidFormat -s $MermaidScale
 Write-Host "Converting Markdown to Word..."
 pandoc $MermaidOutputMd -o $OutputFullPath
 
-# Step 3: Add table borders
-Write-Host "Adding table borders..."
-
 $word = New-Object -ComObject Word.Application
 $word. Visible = $false
 
 try {
     $doc = $word. Documents.Open($OutputFullPath)
+
+    # Step 3: Add table borders
+    Write-Host "Adding table borders..."
     
     foreach ($table in $doc.Tables) {
         $table.Borders.Enable = $true
     }
-    
+
+    Write-Host "Borders added successfully"
+
+    Write-Host "Adjusting image heights..."
+
+    foreach ($shape in $doc.InlineShapes) {
+        if ($shape.Height -gt $MaxImageHeight) {
+            $ratio = $MaxImageHeight / $shape. Height
+            $shape.Height = $MaxImageHeight
+            $shape.Width = $shape.Width * $ratio
+        }
+        
+        if ($shape.Width -gt $MaxImageWidth) {
+            $ratio = $MaxImageWidth / $shape.Width
+            $shape.Width = $MaxImageWidth
+            $shape.Height = $shape.Height * $ratio
+        }
+    }
+
+    Write-Host "Centering images..."
+    foreach ($shape in $doc.InlineShapes) {
+        $shape.Range.ParagraphFormat.Alignment = $wdAlignParagraphCenter
+    }
     $doc.Save()
     $doc.Close()
-    Write-Host "Borders added successfully"
 }
 catch {
     Write-Error "Error processing file: $_"
